@@ -18,12 +18,14 @@ class DioSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
       final response = await dio.get(baseUrl, queryParameters: queryParams);
       final rawData = (response.data is List) ? response.data : (response.data['data'] ?? []);
       
-      if (rawData is! List) throw const NetworkException('Invalid format');
+      // ✅ FIXED: Positional params for NetworkException
+      if (rawData is! List) throw const NetworkException('Invalid format', 500);
       return rawData.map((e) => fromJson(e is Map<String, dynamic> ? e : Map<String, dynamic>.from(e))).toList();
     } on DioException catch (e) {
-      throw NetworkException('FetchAll failed', statusCode: e.response?.statusCode, error: e);
+      // ✅ FIXED: Positional params (Message, StatusCode, Error)
+      throw NetworkException('FetchAll failed', e.response?.statusCode ?? 500, e);
     } catch (e) {
-      throw NetworkException('Unexpected error', error: e);
+      throw NetworkException('Unexpected error', 500, e);
     }
   }
 
@@ -33,7 +35,7 @@ class DioSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
       final response = await dio.get('$baseUrl/$id');
       return fromJson(response.data);
     } on DioException catch (e) {
-      throw NetworkException('FetchOne failed', statusCode: e.response?.statusCode, error: e);
+      throw NetworkException('FetchOne failed', e.response?.statusCode ?? 500, e);
     }
   }
 
@@ -43,7 +45,7 @@ class DioSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
       final response = await dio.post(baseUrl, data: data);
       return SynapseResponse(isSuccess: true, statusCode: response.statusCode, data: response.data);
     } on DioException catch (e) {
-      throw NetworkException('Create failed', statusCode: e.response?.statusCode, error: e);
+      throw NetworkException('Create failed', e.response?.statusCode ?? 500, e);
     }
   }
 
@@ -53,7 +55,7 @@ class DioSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
       final response = await dio.patch('$baseUrl/$id', data: data);
       return SynapseResponse(isSuccess: true, statusCode: response.statusCode, data: response.data);
     } on DioException catch (e) {
-      throw NetworkException('Update failed', statusCode: e.response?.statusCode, error: e);
+      throw NetworkException('Update failed', e.response?.statusCode ?? 500, e);
     }
   }
 
@@ -63,7 +65,7 @@ class DioSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
       final response = await dio.delete('$baseUrl/$id');
       return SynapseResponse(isSuccess: true, statusCode: response.statusCode);
     } on DioException catch (e) {
-      throw NetworkException('Delete failed', statusCode: e.response?.statusCode, error: e);
+      throw NetworkException('Delete failed', e.response?.statusCode ?? 500, e);
     }
   }
 
@@ -74,31 +76,27 @@ class DioSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
       final response = await dio.post('$baseUrl/upload', data: formData);
       return SynapseResponse(isSuccess: true, statusCode: response.statusCode, data: response.data);
     } on DioException catch (e) {
-      throw NetworkException('Upload failed', statusCode: e.response?.statusCode, error: e);
+      throw NetworkException('Upload failed', e.response?.statusCode ?? 500, e);
     }
   }
 
-  // ✅ Feature 11: Real Batch Create Implementation
   @override
   Future<SynapseResponse> batchCreate(List<Map<String, dynamic>> dataList) async {
     try {
-      // Assumes the server has a '/batch/create' endpoint
       final response = await dio.post('$baseUrl/batch/create', data: {'items': dataList});
       return SynapseResponse(isSuccess: true, statusCode: response.statusCode, data: response.data);
     } on DioException catch (e) {
-      throw NetworkException('Batch Create failed', statusCode: e.response?.statusCode, error: e);
+      throw NetworkException('Batch Create failed', e.response?.statusCode ?? 500, e);
     }
   }
 
-  // ✅ Feature 11: Real Batch Update Implementation
   @override
   Future<SynapseResponse> batchUpdate(List<Map<String, dynamic>> dataList) async {
     try {
-      // Assumes the server has a '/batch/update' endpoint
       final response = await dio.post('$baseUrl/batch/update', data: {'items': dataList});
       return SynapseResponse(isSuccess: true, statusCode: response.statusCode, data: response.data);
     } on DioException catch (e) {
-      throw NetworkException('Batch Update failed', statusCode: e.response?.statusCode, error: e);
+      throw NetworkException('Batch Update failed', e.response?.statusCode ?? 500, e);
     }
   }
 }

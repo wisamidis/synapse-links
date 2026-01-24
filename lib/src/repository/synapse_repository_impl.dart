@@ -223,7 +223,8 @@ class SynapseRepositoryImpl<T extends SynapseEntity> implements SynapseRepositor
 
     if (_config.syncPolicy == SynapseSyncPolicy.wifiOnly || _config.syncPolicy == SynapseSyncPolicy.wifiAndCharging) {
       final result = await _connectivity.checkConnectivity();
-      if (result != ConnectivityResult.wifi) return false;
+      // ✅ FIX: Check if the list CONTAINS wifi, don't compare directly
+      if (!result.contains(ConnectivityResult.wifi)) return false;
     }
 
     if (_config.syncPolicy == SynapseSyncPolicy.chargingOnly || _config.syncPolicy == SynapseSyncPolicy.wifiAndCharging) {

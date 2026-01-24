@@ -2,7 +2,7 @@
 
 All notable changes to the **Synapse Link** project will be documented in this file.
 
-## [1.0.2] - 2026-01-24
+## [1.0.3] - 2026-01-24
 
 ### 🚀 Initial Stable Release
 - **Offline-First Core**: Local storage is treated as the primary source of truth, ensuring 100% uptime.

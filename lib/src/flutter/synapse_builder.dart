@@ -12,12 +12,13 @@ class SynapseBuilder<T extends SynapseEntity> extends StatefulWidget {
   final Widget? emptyPlaceholder;
   final Widget Function(BuildContext context, dynamic error)? errorBuilder;
 
+  // ✅ FIXED: Used super.key for modern Flutter code
   const SynapseBuilder({
-    Key? key,
+    super.key,
     required this.builder,
     this.emptyPlaceholder,
     this.errorBuilder,
-  }) : super(key: key);
+  });
 
   @override
   State<SynapseBuilder<T>> createState() => _SynapseBuilderState<T>();

@@ -5,31 +5,46 @@ import '../repository/synapse_repository_impl.dart';
 import '../storage/synapse_storage.dart';
 import '../network/synapse_network.dart';
 import '../core/synapse_config.dart';
-import '../sync/hive_queue_storage.dart';
+import '../sync/queue_storage.dart'; // ✅ Added import for QueueStorage interface
 
-/// The Glue that holds everything together.
-/// Injects the Repository into the widget tree.
+/// The Glue that holds the SynapseLink ecosystem together.
+/// 
+/// This [StatefulWidget] initializes the [SynapseRepository] and injects it 
+/// into the widget tree using an [InheritedWidget] for efficient access.
 class SynapseProvider<T extends SynapseEntity> extends StatefulWidget {
+  /// The local storage engine (e.g., HiveStorage).
   final SynapseStorage<T> storage;
+
+  /// The remote network layer (e.g., DioSynapseNetwork).
   final SynapseNetwork<T> network;
+
+  /// The offline queue storage (e.g., HiveQueueStorage or InMemoryQueueStorage).
+  final QueueStorage queueStorage;
+
+  /// Configuration for sync policies and cache TTL.
   final SynapseConfig config;
+
+  /// The root widget of your application or module.
   final Widget child;
 
   const SynapseProvider({
     super.key,
     required this.storage,
     required this.network,
+    required this.queueStorage, // ✅ Now strictly required and flexible
     this.config = const SynapseConfig(),
     required this.child,
   });
 
-  /// Helper to find the repository in the context.
+  /// Static helper to find the [SynapseRepository] instance in the widget tree.
+  /// 
+  /// Usage: `final repo = SynapseProvider.of<MyModel>(context);`
   static SynapseRepository<T> of<T extends SynapseEntity>(BuildContext context) {
     final provider = context.dependOnInheritedWidgetOfExactType<_SynapseInherited<T>>();
     if (provider == null) {
       throw Exception(
         'SynapseProvider<$T> not found in context. '
-        'Make sure to wrap your widget tree with SynapseProvider<$T> at the top level.',
+        'Ensure you wrap your app with SynapseProvider<$T> at the top level.',
       );
     }
     return provider.repository;
@@ -45,24 +60,26 @@ class _SynapseProviderState<T extends SynapseEntity> extends State<SynapseProvid
   @override
   void initState() {
     super.initState();
-    // Initialize the repository implementation
+    // ✅ Initialize the repository using the provided storage engines.
+    // We pass the queueStorage from the widget to maintain flexibility.
     _repository = SynapseRepositoryImpl<T>(
       storage: widget.storage,
       network: widget.network,
-      queueStorage: HiveQueueStorage(),
+      queueStorage: widget.queueStorage, // ✅ Fixed: No longer hardcoded
       config: widget.config,
     );
   }
 
   @override
   void dispose() {
-    // Cleanup resources (streams, connections)
+    // ✅ Properly cleanup streams and resources to prevent memory leaks.
     _repository.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Wraps the child in a private InheritedWidget to provide the repository.
     return _SynapseInherited<T>(
       repository: _repository,
       child: widget.child,
@@ -70,6 +87,7 @@ class _SynapseProviderState<T extends SynapseEntity> extends State<SynapseProvid
   }
 }
 
+/// Private [InheritedWidget] that stores the repository instance.
 class _SynapseInherited<T extends SynapseEntity> extends InheritedWidget {
   final SynapseRepository<T> repository;
 
@@ -81,8 +99,7 @@ class _SynapseInherited<T extends SynapseEntity> extends InheritedWidget {
 
   @override
   bool updateShouldNotify(_SynapseInherited<T> oldWidget) {
-    // We don't need to rebuild dependents if the repo instance stays the same.
-    // The streams inside the repo handle the updates.
+    // The repository instance remains constant; updates are handled via streams.
     return false;
   }
 }

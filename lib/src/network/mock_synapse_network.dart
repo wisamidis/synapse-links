@@ -6,6 +6,7 @@ import 'synapse_network.dart';
 import 'synapse_response.dart';
 
 /// A fake network implementation for testing and offline development.
+/// Simulates latency and server-side logic.
 class MockSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
   final T Function(Map<String, dynamic>) fromJson;
   final Duration delay;
@@ -23,7 +24,8 @@ class MockSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
   Future<void> _simulateNetwork() async {
     await Future.delayed(delay);
     if (simulateErrors) {
-      throw const NetworkException('Simulation: Network Failure', statusCode: 500);
+      // ✅ FIXED: Using positional parameters (Message, StatusCode)
+      throw const NetworkException('Simulation: Network Failure', 500);
     }
   }
 
@@ -38,7 +40,8 @@ class MockSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
   Future<T> fetchOne(String id) async {
     await _simulateNetwork();
     if (_serverDb.containsKey(id)) return fromJson(_serverDb[id]!);
-    throw const NetworkException('Item not found', statusCode: 404);
+    // ✅ FIXED: Positional parameters
+    throw const NetworkException('Item not found', 404);
   }
 
   @override
@@ -58,7 +61,10 @@ class MockSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
   @override
   Future<SynapseResponse> update(String id, Map<String, dynamic> changes) async {
     await _simulateNetwork();
-    if (!_serverDb.containsKey(id)) throw const NetworkException('Item not found', statusCode: 404);
+    if (!_serverDb.containsKey(id)) {
+        // ✅ FIXED: Positional parameters
+        throw const NetworkException('Item not found', 404);
+    }
     
     final mergedData = {..._serverDb[id]!, ...changes, 'updatedAt': DateTime.now().toIso8601String()};
     _serverDb[id] = mergedData;
@@ -70,7 +76,10 @@ class MockSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
   @override
   Future<SynapseResponse> delete(String id) async {
     await _simulateNetwork();
-    if (!_serverDb.containsKey(id)) throw const NetworkException('Item not found', statusCode: 404);
+    if (!_serverDb.containsKey(id)) {
+        // ✅ FIXED: Positional parameters
+        throw const NetworkException('Item not found', 404);
+    }
     
     _serverDb.remove(id);
     debugPrint("📡 Mock: Deleted item $id");
@@ -83,7 +92,6 @@ class MockSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
     return const SynapseResponse(isSuccess: true, statusCode: 200, data: "https://mock.url/file.png");
   }
 
-  // ✅ Implementation of Batch Create (Mock)
   @override
   Future<SynapseResponse> batchCreate(List<Map<String, dynamic>> dataList) async {
     await _simulateNetwork();
@@ -97,7 +105,6 @@ class MockSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
     return const SynapseResponse(isSuccess: true, statusCode: 201);
   }
 
-  // ✅ Implementation of Batch Update (Mock)
   @override
   Future<SynapseResponse> batchUpdate(List<Map<String, dynamic>> dataList) async {
     await _simulateNetwork();

@@ -5,7 +5,7 @@
 /// 2. Robust Network Synchronization (Dio / REST).
 /// 3. Offline-First Capability with Smart Queue Management.
 /// 4. Optimistic UI Updates & Deep Conflict Resolution.
-library synapse_link;
+library;
 
 // -----------------------------------------------------------------------------
 // 1. Core Module (The Data Contract)
