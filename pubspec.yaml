@@ -1,26 +1,27 @@
 name: synapse_link
-description: A high-performance, professional offline-first synchronization library for Flutter. It bridges the gap between local storage and remote APIs with real-time data consistency and intelligent sync policies.
-version: 1.0.1
+description: A professional offline-first sync library for Flutter, bridging local storage and remote APIs with real-time consistency. 
+version: 1.0.2
 homepage: https://github.com/wisamidis/synapse-links
-repository: https://github.com/wisamidis/synapse-links
+
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=3.0.0"
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.10.0"
 
 dependencies:
   flutter:
     sdk: flutter
 
-  dio: ^5.4.0
+  battery_plus: ^6.2.0
+  connectivity_plus: ^6.1.0
+  dio: ^5.7.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  uuid: ^4.2.1
-  connectivity_plus: ^6.0.0
-  battery_plus: ^6.0.0
-  rxdart: ^0.27.7
+  path_provider: ^2.1.5
+  rxdart: ^0.28.0
+  uuid: ^4.5.1
   workmanager: ^0.5.2
-  path_provider: ^2.1.2
+
 
 dev_dependencies:
   flutter_test:

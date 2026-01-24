@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../core/synapse_entity.dart';
 import '../core/synapse_exception.dart';
 import 'synapse_network.dart';
+import 'synapse_response.dart';
 
 /// A fake network implementation for testing and offline development.
 class MockSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
@@ -15,98 +16,98 @@ class MockSynapseNetwork<T extends SynapseEntity> implements SynapseNetwork<T> {
 
   const MockSynapseNetwork({
     required this.fromJson,
-    this.delay = const Duration(milliseconds: 800), // More realistic delay
+    this.delay = const Duration(milliseconds: 800),
     this.simulateErrors = false,
   });
 
   Future<void> _simulateNetwork() async {
     await Future.delayed(delay);
     if (simulateErrors) {
-      throw NetworkException('Simulation: Random Network Failure', statusCode: 500);
+      throw const NetworkException('Simulation: Network Failure', statusCode: 500);
     }
   }
 
   @override
   Future<List<T>> fetchAll({Map<String, dynamic>? queryParams}) async {
     await _simulateNetwork();
-    debugPrint('📡 Mock: Fetching all items (${_serverDb.length} found)...');
-    
-    // Simulate Pagination if needed based on queryParams
+    debugPrint('📡 Mock: Fetching all items...');
     return _serverDb.values.map((json) => fromJson(json)).toList();
   }
 
   @override
   Future<T> fetchOne(String id) async {
     await _simulateNetwork();
-    debugPrint('📡 Mock: Fetching item: $id');
-    
-    if (_serverDb.containsKey(id)) {
-      return fromJson(_serverDb[id]!);
-    }
-    
-    // Simulate real 404 error instead of fake data
-    throw NetworkException('Item not found', statusCode: 404);
+    if (_serverDb.containsKey(id)) return fromJson(_serverDb[id]!);
+    throw const NetworkException('Item not found', statusCode: 404);
   }
 
   @override
-  Future<T> create(Map<String, dynamic> data) async {
+  Future<SynapseResponse> create(Map<String, dynamic> data) async {
     await _simulateNetwork();
-    
     final mockData = Map<String, dynamic>.from(data);
     
-    // Ensure ID exists
-    if (!mockData.containsKey('id')) {
-      mockData['id'] = 'mock_${DateTime.now().millisecondsSinceEpoch}';
-    }
-    // Ensure timestamp
-    if (!mockData.containsKey('updatedAt')) {
-       mockData['updatedAt'] = DateTime.now().toIso8601String();
-    }
+    if (!mockData.containsKey('id')) mockData['id'] = 'mock_${DateTime.now().millisecondsSinceEpoch}';
+    if (!mockData.containsKey('updatedAt')) mockData['updatedAt'] = DateTime.now().toIso8601String();
     
-    debugPrint("📡 Mock: Created item ${mockData['id']}");
     _serverDb[mockData['id']] = mockData;
-    
-    return fromJson(mockData);
+    debugPrint("📡 Mock: Created item ${mockData['id']}");
+
+    return SynapseResponse(isSuccess: true, statusCode: 201, data: fromJson(mockData));
   }
 
   @override
-  Future<T> update(String id, Map<String, dynamic> changes) async {
+  Future<SynapseResponse> update(String id, Map<String, dynamic> changes) async {
     await _simulateNetwork();
+    if (!_serverDb.containsKey(id)) throw const NetworkException('Item not found', statusCode: 404);
     
-    if (!_serverDb.containsKey(id)) {
-       throw NetworkException('Item not found for update', statusCode: 404);
-    }
-    
-    debugPrint('📡 Mock: PATCH item $id with: $changes');
-    
-    final oldData = _serverDb[id]!;
-    
-    // Merge changes (PATCH behavior)
-    final mergedData = {
-      ...oldData,
-      ...changes,
-      'updatedAt': DateTime.now().toIso8601String(), // Update timestamp
-    };
-    
+    final mergedData = {..._serverDb[id]!, ...changes, 'updatedAt': DateTime.now().toIso8601String()};
     _serverDb[id] = mergedData;
+    debugPrint("📡 Mock: Updated item $id");
 
-    return fromJson(mergedData);
+    return SynapseResponse(isSuccess: true, statusCode: 200, data: fromJson(mergedData));
   }
 
   @override
-  Future<void> delete(String id) async {
+  Future<SynapseResponse> delete(String id) async {
     await _simulateNetwork();
-    debugPrint('📡 Mock: Deleted item $id');
-    if (!_serverDb.containsKey(id)) {
-       throw NetworkException('Item not found for delete', statusCode: 404);
-    }
+    if (!_serverDb.containsKey(id)) throw const NetworkException('Item not found', statusCode: 404);
+    
     _serverDb.remove(id);
+    debugPrint("📡 Mock: Deleted item $id");
+    return const SynapseResponse(isSuccess: true, statusCode: 200);
   }
 
   @override
-  Future<String> uploadFile(String filePath) async {
+  Future<SynapseResponse> uploadFile(String filePath) async {
     await _simulateNetwork();
-    debugPrint('📡 Mock: Uploaded file from $filePath');
-    return "https://via.placeholder.com/150";
+    return const SynapseResponse(isSuccess: true, statusCode: 200, data: "https://mock.url/file.png");
+  }
+
+  // ✅ Implementation of Batch Create (Mock)
+  @override
+  Future<SynapseResponse> batchCreate(List<Map<String, dynamic>> dataList) async {
+    await _simulateNetwork();
+    debugPrint("📡 Mock: Batch Creating ${dataList.length} items...");
+    
+    for (var data in dataList) {
+       final mockData = Map<String, dynamic>.from(data);
+       if (!mockData.containsKey('id')) mockData['id'] = 'batch_${DateTime.now().millisecondsSinceEpoch}_${data.hashCode}';
+       _serverDb[mockData['id']] = mockData;
+    }
+    return const SynapseResponse(isSuccess: true, statusCode: 201);
+  }
+
+  // ✅ Implementation of Batch Update (Mock)
+  @override
+  Future<SynapseResponse> batchUpdate(List<Map<String, dynamic>> dataList) async {
+    await _simulateNetwork();
+    debugPrint("📡 Mock: Batch Updating ${dataList.length} items...");
+    
+    for (var data in dataList) {
+      if (data.containsKey('id') && _serverDb.containsKey(data['id'])) {
+         _serverDb[data['id']] = {..._serverDb[data['id']]!, ...data};
+      }
+    }
+    return const SynapseResponse(isSuccess: true, statusCode: 200);
   }
 }

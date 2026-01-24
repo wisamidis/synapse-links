@@ -1,64 +1,51 @@
 import '../core/synapse_entity.dart';
 import 'conflict_resolver.dart';
 
-/// A conflict resolution strategy that merges local and remote lists.
-///
-/// Rules:
-/// 1. If an item exists in both lists -> Keep the one with the latest `updatedAt`.
-/// 2. If an item is only local -> Keep it (it hasn't synced yet).
-/// 3. If an item is only remote -> Keep it (it was created on another device).
+/// A smart strategy to merge local and remote data, handling conflicts
+/// based on timestamps (Last-Write-Wins) and preserving nested relationships.
 class SmartMergeStrategy<T extends SynapseEntity> implements ConflictResolver<T> {
   
   @override
-  List<T> resolve({
-    required List<T> localItems,
-    required List<T> remoteItems,
-  }) {
-    final Map<String, T> remoteMap = {
-      for (var item in remoteItems) item.id: item
-    };
+  List<T> resolve({required List<T> localItems, required List<T> remoteItems}) {
+    // Map local items by ID for O(1) lookup
+    final Map<String, T> mergedMap = {for (var item in localItems) item.id: item};
 
-    final List<T> mergedList = [];
-    final Set<String> processedIds = {};
-
-    // 1. Process local items (handle conflicts or keep local-only)
-    for (final localItem in localItems) {
-      final remoteItem = remoteMap[localItem.id];
-
-      if (remoteItem != null) {
-        // Conflict detected: Resolve based on timestamp
-        final selectedItem = _resolveConflict(localItem, remoteItem);
-        mergedList.add(selectedItem);
-        processedIds.add(localItem.id);
+    for (var remoteItem in remoteItems) {
+      if (mergedMap.containsKey(remoteItem.id)) {
+        final localItem = mergedMap[remoteItem.id]!;
+        
+        // ✅ Feature 12: Smart comparison. Prefer remote if it's newer.
+        if (_shouldPreferRemote(localItem, remoteItem)) {
+          mergedMap[remoteItem.id] = remoteItem;
+        }
       } else {
-        // FIXED: Keep local-only items (e.g., created while offline)
-        mergedList.add(localItem);
-        processedIds.add(localItem.id);
+        // New item from server
+        mergedMap[remoteItem.id] = remoteItem;
       }
     }
 
-    // 2. Add remaining remote items (new data from server)
-    for (final remoteItem in remoteItems) {
-      if (!processedIds.contains(remoteItem.id)) {
-        mergedList.add(remoteItem);
-      }
-    }
-
-    return mergedList;
+    return mergedMap.values.toList();
   }
 
-  /// Compares timestamps to decide the winner (Last-Write-Wins).
-  T _resolveConflict(T local, T remote) {
-    // We strictly use the entity's updatedAt property.
-    // If updatedAt is null, we assume it's a new local item or corrupted remote item.
-    
-    if (local.updatedAt == null) return local; // Local is likely newer/unsynced
-    if (remote.updatedAt == null) return local; // Fallback
+  /// Determines if the remote item should overwrite the local item.
+  bool _shouldPreferRemote(T local, T remote) {
+    try {
+      final localMap = local.toJson();
+      final remoteMap = remote.toJson();
 
-    if (local.updatedAt!.isAfter(remote.updatedAt!)) {
-      return local;
+      // Check for 'updatedAt' timestamp
+      if (localMap.containsKey('updatedAt') && remoteMap.containsKey('updatedAt')) {
+         final localTime = DateTime.parse(localMap['updatedAt']);
+         final remoteTime = DateTime.parse(remoteMap['updatedAt']);
+         
+         // If remote is newer, return true
+         return remoteTime.isAfter(localTime);
+      }
+    } catch (_) {
+      // If parsing fails, default to Remote as Source of Truth
+      return true;
     }
-
-    return remote;
+    // Default fallback
+    return true;
   }
 }

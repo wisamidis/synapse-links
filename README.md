@@ -26,7 +26,7 @@ Add the following dependency to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  synapse_link: ^1.0.0
+  synapse_link: ^1.0.2
 ```
 
 ### Basic Usage

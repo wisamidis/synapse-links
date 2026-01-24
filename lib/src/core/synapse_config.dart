@@ -1,20 +1,39 @@
+/// Defines the conditions under which synchronization should occur.
 enum SynapseSyncPolicy {
-  immediate,       // Sync ASAP (Data/WiFi)
-  wifiOnly,        // Save data
-  wifiAndCharging, // Background heavy tasks
-  manual,          // Developer calls sync() explicitly
+  /// Sync immediately whenever data changes (Default).
+  immediate,
+
+  /// Sync only when the device is connected to WiFi.
+  wifiOnly,
+
+  /// Sync only when the device is plugged in and charging.
+  chargingOnly,
+
+  /// Sync only when connected to WiFi AND charging.
+  wifiAndCharging,
 }
 
+/// Configuration class for the Synapse library.
 class SynapseConfig {
+  /// The active synchronization policy.
   final SynapseSyncPolicy syncPolicy;
-  final Duration cacheTtl;
-  final bool clearExpiredCache;
-  final int maxRetries; // Added: For robustness
 
+  /// The interval between periodic background sync attempts.
+  final Duration syncInterval;
+
+  /// ✅ Fixed: Time-To-Live for local cache. 
+  /// Data older than this will be considered expired.
+  /// If null, data never expires.
+  final Duration? cacheTtl;
+
+  /// ✅ Fixed: Whether to automatically delete expired data on startup.
+  final bool clearExpiredCache;
+
+  /// Creates a new configuration instance.
   const SynapseConfig({
-    this.syncPolicy = SynapseSyncPolicy.immediate, // Changed: More UX friendly default
-    this.cacheTtl = const Duration(days: 7), // Changed: 24h is too short for offline-first apps
+    this.syncPolicy = SynapseSyncPolicy.immediate,
+    this.syncInterval = const Duration(minutes: 15),
+    this.cacheTtl, // Default is null (no expiry)
     this.clearExpiredCache = false,
-    this.maxRetries = 3,
   });
 }

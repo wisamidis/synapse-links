@@ -1,28 +1,34 @@
 import 'package:hive/hive.dart';
 import '../core/synapse_entity.dart';
 import '../core/synapse_exception.dart';
-import '../core/synapse_config.dart';
 import 'synapse_storage.dart';
 import 'synapse_migrator.dart';
+import '../core/synapse_config.dart';
 
+/// A robust implementation of local storage using Hive (NoSQL).
+/// Supports Schema Migration and Data Expiry (TTL).
 class HiveStorage<T extends SynapseEntity> implements SynapseStorage<T> {
+  /// The name of the Hive box (table).
   final String boxName;
+
+  /// Factory function to convert JSON to Entity.
   final T Function(Map<String, dynamic>) fromJson;
+
+  /// Helper class to handle version upgrades.
   final SynapseMigrator? migrator;
-  final SynapseConfig config;
+
+  /// Configuration for TTL and expiry policies.
+  final SynapseConfig? config;
 
   Box? _box;
   static const String _versionKey = '__schema_version__';
-  
-  static const String _kData = '__data__';
-  static const String _kTimestamp = '__ts__';
 
   HiveStorage({
     required this.boxName,
     required this.fromJson,
     this.migrator,
-    SynapseConfig? config,
-  }) : config = config ?? const SynapseConfig();
+    this.config,
+  });
 
   Future<void> initialize() async {
     try {
@@ -32,12 +38,18 @@ class HiveStorage<T extends SynapseEntity> implements SynapseStorage<T> {
         _box = await Hive.openBox(boxName);
       }
 
+      // Handle Schema Migration
       if (migrator != null) {
         await _performMigration();
       }
+
+      // Handle Data Expiry (TTL) safely
+      if (config != null && config!.clearExpiredCache && config!.cacheTtl != null) {
+        await _clearExpiredData();
+      }
+
     } catch (e, stack) {
-      throw StorageException(
-          'Failed to initialize Hive box: $boxName', e, stack);
+      throw StorageException('Failed to initialize Hive box: $boxName', e, stack);
     }
   }
 
@@ -51,75 +63,26 @@ class HiveStorage<T extends SynapseEntity> implements SynapseStorage<T> {
   @override
   Future<void> write(T entity) async {
     final box = await _getSafeBox();
-    
-    final wrappedData = {
-      _kData: entity.toJson(),
-      _kTimestamp: DateTime.now().millisecondsSinceEpoch,
-    };
-    
-    await box.put(entity.id, wrappedData);
+    await box.put(entity.id, entity.toJson());
   }
 
   @override
   Future<T?> read(String id) async {
     final box = await _getSafeBox();
-    final rawData = box.get(id);
-
-    if (rawData == null) return null;
-
-    final mapData = Map<String, dynamic>.from(rawData);
-
-    if (mapData.containsKey(_kData) && mapData.containsKey(_kTimestamp)) {
-      final int timestamp = mapData[_kTimestamp];
-      final DateTime savedAt = DateTime.fromMillisecondsSinceEpoch(timestamp);
-      
-      if (DateTime.now().difference(savedAt) > config.cacheTtl) {
-        if (config.clearExpiredCache) {
-          await box.delete(id);
-        }
-        return null;
-      }
-      
-      return fromJson(Map<String, dynamic>.from(mapData[_kData]));
+    final data = box.get(id);
+    if (data != null) {
+      return fromJson(Map<String, dynamic>.from(data));
     }
-
-    return fromJson(mapData);
+    return null;
   }
 
   @override
   Future<List<T>> readAll() async {
     final box = await _getSafeBox();
-    final List<T> results = [];
-    final List<String> expiredKeys = [];
-
-    for (var key in box.keys) {
-      if (key == _versionKey) continue;
-
-      final rawData = box.get(key);
-      if (rawData is! Map) continue;
-
-      final mapData = Map<String, dynamic>.from(rawData);
-
-      if (mapData.containsKey(_kData) && mapData.containsKey(_kTimestamp)) {
-         final int timestamp = mapData[_kTimestamp];
-         final DateTime savedAt = DateTime.fromMillisecondsSinceEpoch(timestamp);
-
-         if (DateTime.now().difference(savedAt) > config.cacheTtl) {
-           if (config.clearExpiredCache) expiredKeys.add(key);
-           continue;
-         }
-         
-         results.add(fromJson(Map<String, dynamic>.from(mapData[_kData])));
-      } else {
-        results.add(fromJson(mapData));
-      }
-    }
-
-    if (expiredKeys.isNotEmpty) {
-      await box.deleteAll(expiredKeys);
-    }
-
-    return results;
+    return box.values
+        .where((v) => v is Map && !v.containsKey(_versionKey))
+        .map((v) => fromJson(Map<String, dynamic>.from(v)))
+        .toList();
   }
 
   @override
@@ -132,11 +95,9 @@ class HiveStorage<T extends SynapseEntity> implements SynapseStorage<T> {
   Future<void> clear() async {
     final box = await _getSafeBox();
     await box.clear();
-    if (migrator != null) {
-       await box.put(_versionKey, migrator!.currentVersion);
-    }
   }
 
+  /// ✅ Fixed: Renamed from 'dispose' to 'close' to match the abstract class.
   @override
   Future<void> close() async {
     if (_box != null && _box!.isOpen) {
@@ -144,6 +105,7 @@ class HiveStorage<T extends SynapseEntity> implements SynapseStorage<T> {
     }
   }
 
+  /// Handles upgrading data structure when the app version changes.
   Future<void> _performMigration() async {
     final box = await _getSafeBox();
     final int storedVersion = box.get(_versionKey, defaultValue: 1);
@@ -152,41 +114,44 @@ class HiveStorage<T extends SynapseEntity> implements SynapseStorage<T> {
     if (storedVersion < targetVersion) {
       for (var key in box.keys) {
         if (key == _versionKey) continue;
-        
-        final rawData = box.get(key);
-        if (rawData is Map) {
-          Map<String, dynamic> dataToMigrate;
-          bool isWrapped = false;
-          int? timestamp;
-
-          final mapData = Map<String, dynamic>.from(rawData);
-          if (mapData.containsKey(_kData)) {
-            dataToMigrate = Map<String, dynamic>.from(mapData[_kData]);
-            timestamp = mapData[_kTimestamp];
-            isWrapped = true;
-          } else {
-            dataToMigrate = mapData;
-          }
-
+        final data = box.get(key);
+        if (data is Map) {
           final upgraded = migrator!.migrate(
-            dataToMigrate,
+            Map<String, dynamic>.from(data), 
             storedVersion,
           );
-
-          if (isWrapped) {
-            await box.put(key, {
-              _kData: upgraded,
-              _kTimestamp: timestamp,
-            });
-          } else {
-            await box.put(key, {
-               _kData: upgraded,
-               _kTimestamp: DateTime.now().millisecondsSinceEpoch,
-            });
-          }
+          await box.put(key, upgraded);
         }
       }
       await box.put(_versionKey, targetVersion);
+    }
+  }
+
+  /// Clear Expired Data (TTL)
+  Future<void> _clearExpiredData() async {
+    final box = await _getSafeBox();
+    final expiryThreshold = DateTime.now().subtract(config!.cacheTtl!);
+
+    final keysToDelete = <String>[];
+
+    for (var key in box.keys) {
+      if (key == _versionKey) continue;
+
+      final data = box.get(key);
+      if (data is Map && data.containsKey('updatedAt')) {
+        try {
+          final updatedAt = DateTime.parse(data['updatedAt']);
+          if (updatedAt.isBefore(expiryThreshold)) {
+            keysToDelete.add(key);
+          }
+        } catch (_) {
+          // Ignore parsing errors
+        }
+      }
+    }
+
+    if (keysToDelete.isNotEmpty) {
+      await box.deleteAll(keysToDelete);
     }
   }
 }
