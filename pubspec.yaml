@@ -14,8 +14,8 @@ dependencies:
   battery_plus: ^6.2.3
   connectivity_plus: ^6.1.0
   dio: ^5.7.0
-  drift:
-  isar:
+  drift: ^2.30.1
+  isar: ^3.1.0+1
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   path_provider: ^2.1.5
