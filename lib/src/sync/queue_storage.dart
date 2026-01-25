@@ -1,19 +1,36 @@
 import 'queue_item.dart';
 
-/// Abstract contract for storing the offline request queue.
+/// Abstract interface for persisting the Sync Queue.
+/// This allows swapping between Hive, SQLite, or Memory for the queue itself.
 abstract class QueueStorage {
-  /// Adds a new item to the queue.
   Future<void> add(QueueItem item);
-
-  /// Removes an item from the queue by ID.
   Future<void> remove(String id);
-
-  /// ✅ Added: Updates an existing item in the queue.
-  Future<void> update(QueueItem item);
-
-  /// Retrieves all pending items in the queue.
   Future<List<QueueItem>> getAll();
-
-  /// Clears the entire queue.
   Future<void> clear();
+}
+
+/// ✅ ADDED: The Missing Implementation
+/// A simple in-memory queue for testing and demos.
+class InMemoryQueueStorage implements QueueStorage {
+  final List<QueueItem> _queue = [];
+
+  @override
+  Future<void> add(QueueItem item) async {
+    _queue.add(item);
+  }
+
+  @override
+  Future<void> remove(String id) async {
+    _queue.removeWhere((item) => item.id == id);
+  }
+
+  @override
+  Future<List<QueueItem>> getAll() async {
+    return List.from(_queue);
+  }
+
+  @override
+  Future<void> clear() async {
+    _queue.clear();
+  }
 }

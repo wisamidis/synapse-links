@@ -44,7 +44,6 @@ class HiveQueueStorage implements QueueStorage {
     await box.put(item.id, item.toMap());
   }
 
-  @override
   Future<void> update(QueueItem item) async {
     final box = await _db;
     await box.put(item.id, item.toMap());

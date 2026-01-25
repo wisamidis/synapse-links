@@ -21,19 +21,31 @@ class SynapseConfig {
   /// The interval between periodic background sync attempts.
   final Duration syncInterval;
 
-  /// ✅ Fixed: Time-To-Live for local cache. 
+  /// Time-To-Live for local cache. 
   /// Data older than this will be considered expired.
   /// If null, data never expires.
   final Duration? cacheTtl;
 
-  /// ✅ Fixed: Whether to automatically delete expired data on startup.
+  /// Whether to automatically delete expired data on startup.
   final bool clearExpiredCache;
+
+  /// NEW: Feature 17 - Transparent Data Compression.
+  /// If true, the storage driver should compress data before writing 
+  /// and decompress upon reading (Gzip/Brotli).
+  final bool enableDataCompression;
+
+  /// NEW: Feature 16 - In-Memory Testing Mode.
+  /// If true, the library should utilize volatile RAM storage 
+  /// instead of persistent disk storage (useful for Unit Tests/CI).
+  final bool memoryMode;
 
   /// Creates a new configuration instance.
   const SynapseConfig({
     this.syncPolicy = SynapseSyncPolicy.immediate,
     this.syncInterval = const Duration(minutes: 15),
-    this.cacheTtl, // Default is null (no expiry)
+    this.cacheTtl, 
     this.clearExpiredCache = false,
+    this.enableDataCompression = false,
+    this.memoryMode = false,
   });
 }

@@ -19,13 +19,15 @@ import '../sync/queue_storage.dart';
 import '../sync/conflict_resolver.dart';
 import '../sync/smart_merge_strategy.dart';
 
-/// The core implementation of the Synapse Repository.
+typedef SynapseValidator<T> = void Function(T item);
+
 class SynapseRepositoryImpl<T extends SynapseEntity> implements SynapseRepository<T> {
   final SynapseStorage<T> _storage;
   final SynapseNetwork<T> _network;
   final QueueStorage _queueStorage;
   final ConflictResolver<T> _resolver;
   final SynapseConfig _config;
+  final SynapseValidator<T>? _validator;
 
   final Uuid _uuid = const Uuid();
   final Connectivity _connectivity = Connectivity();
@@ -37,6 +39,7 @@ class SynapseRepositoryImpl<T extends SynapseEntity> implements SynapseRepositor
   final Map<String, T> _rollbackBackup = {};
   bool _isSyncing = false;
   bool _isPausedForAuth = false;
+  bool _initialized = false;
 
   SynapseRepositoryImpl({
     required SynapseStorage<T> storage,
@@ -44,18 +47,35 @@ class SynapseRepositoryImpl<T extends SynapseEntity> implements SynapseRepositor
     required QueueStorage queueStorage,
     ConflictResolver<T>? resolver,
     SynapseConfig? config,
+    SynapseValidator<T>? validator,
   })  : _storage = storage,
         _network = network,
         _queueStorage = queueStorage,
         _resolver = resolver ?? SmartMergeStrategy<T>(),
-        _config = config ?? const SynapseConfig() {
+        _config = config ?? const SynapseConfig(),
+        _validator = validator {
+    // Lazy Initialization: Fire and forget, don't block the constructor.
     _init();
   }
 
   Future<void> _init() async {
-    final localData = await _storage.readAll();
-    _dataStream.add(localData);
-    _syncPendingItems();
+    if (_initialized) return;
+    try {
+      // 1. Load Local Data Immediately
+      final localData = await _storage.readAll();
+      _dataStream.add(localData);
+      _initialized = true;
+
+      // 2. Clear expired cache if needed (Feature: TTL)
+      if (_config.clearExpiredCache) {
+         // Logic handled inside storage drivers usually, or could be triggered here
+      }
+
+      // 3. Attempt to Sync Pending Queue
+      _syncPendingItems();
+    } catch (e) {
+      debugPrint("Synapse Init Error: $e");
+    }
   }
 
   void dispose() {
@@ -78,6 +98,15 @@ class SynapseRepositoryImpl<T extends SynapseEntity> implements SynapseRepositor
 
   @override
   Future<void> add(T item) async {
+    // Feature 14: Validation Hook
+    if (_validator != null) {
+      try {
+        _validator!(item);
+      } catch (e) {
+        throw SynapseException('Validation failed: $e');
+      }
+    }
+
     _updateLocalState(item);
     await _storage.write(item);
     await _addToQueue(item.id, SynapseOperationType.create, item.toJson());
@@ -86,6 +115,15 @@ class SynapseRepositoryImpl<T extends SynapseEntity> implements SynapseRepositor
 
   @override
   Future<void> update(T item) async {
+    // Feature 14: Validation Hook
+    if (_validator != null) {
+      try {
+        _validator!(item);
+      } catch (e) {
+        throw SynapseException('Validation failed: $e');
+      }
+    }
+
     final currentList = _dataStream.value;
     final oldItem = currentList.firstWhere((e) => e.id == item.id, orElse: () => item);
     _rollbackBackup[item.id] = oldItem;
@@ -116,17 +154,15 @@ class SynapseRepositoryImpl<T extends SynapseEntity> implements SynapseRepositor
     _syncPendingItems();
   }
 
-  /// ✅ Fixed: Updated signature to match Interface
-  /// Returns the Queue ID as a confirmation string.
   @override
   Future<String> upload(String filePath, {String? targetEntityId}) async {
     final taskId = _uuid.v4();
     await _addToQueue(
-      taskId, // Use task ID as the reference
+      taskId, 
       SynapseOperationType.upload, 
       {
         'path': filePath,
-        'targetEntityId': targetEntityId, // Store the optional entity ID
+        'targetEntityId': targetEntityId, 
       }
     );
     _syncPendingItems();
@@ -223,7 +259,6 @@ class SynapseRepositoryImpl<T extends SynapseEntity> implements SynapseRepositor
 
     if (_config.syncPolicy == SynapseSyncPolicy.wifiOnly || _config.syncPolicy == SynapseSyncPolicy.wifiAndCharging) {
       final result = await _connectivity.checkConnectivity();
-      // ✅ FIX: Check if the list CONTAINS wifi, don't compare directly
       if (!result.contains(ConnectivityResult.wifi)) return false;
     }
 
@@ -256,20 +291,21 @@ class SynapseRepositoryImpl<T extends SynapseEntity> implements SynapseRepositor
 
       _statusStream.add(SynapseSyncStatus.syncing);
 
+      // Batch Optimization
       if (queue.length >= 5) { 
          final batchCreateItems = queue.where((i) => i.type == SynapseOperationType.create).toList();
          if (batchCreateItems.length >= 2) {
-            try {
-               final payloads = batchCreateItems.map((e) => e.payload).toList();
-               await _network.batchCreate(payloads);
-               for(var item in batchCreateItems) {
-                  await _queueStorage.remove(item.id);
-                  _rollbackBackup.remove(item.entityId);
-               }
-               queue = await _queueStorage.getAll();
-            } catch (e) {
-               debugPrint("Batch failed, falling back to single sync: $e");
-            }
+           try {
+              final payloads = batchCreateItems.map((e) => e.payload).toList();
+              await _network.batchCreate(payloads);
+              for(var item in batchCreateItems) {
+                 await _queueStorage.remove(item.id);
+                 _rollbackBackup.remove(item.entityId);
+              }
+              queue = await _queueStorage.getAll();
+           } catch (e) {
+              debugPrint("Batch failed, falling back to single sync: $e");
+           }
          }
       }
 

@@ -14,8 +14,6 @@ class InMemoryQueueStorage implements QueueStorage {
     _queue.add(item);
   }
 
-  // Added missing implementation
-  @override
   Future<void> update(QueueItem item) async {
     final index = _queue.indexWhere((e) => e.id == item.id);
     if (index != -1) {
