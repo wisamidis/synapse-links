@@ -1,30 +1,34 @@
-## [1.0.4] - 2026-01-26
+## [1.0.5] - 2026-01-29
 
-### 🚀 Major Release: Architecture Overhaul & Developer Experience
+### 🛡️ The Enterprise Reliability Update: Security, Background Sync & Stability
 
-This release introduces a completely redesigned architecture focusing on ease of use, performance, and flexibility.
+This release transforms SynapseLink from a sync engine into a full lifecycle management system. We focused on "Day 2" operations: debugging, security compliance, background persistence, and UI performance.
 
 ### ✨ New Features
 
-* **Facade Initialization:** Introduced `Synapse.create(...)` for a streamlined, one-line setup experience. Reduced boilerplate code by 80%.
-* **Multi-Driver Storage Support:**
-    * Added **Drift (SQL)** support via `DriftStorage`.
-    * Added **Isar (NoSQL)** support via `IsarStorage`.
-    * Enhanced **Hive** support with transparent compression.
-* **Pre-Sync Validation Hooks:** New `validator` parameter allows developers to define rules that run before data enters the local database or sync queue, preventing garbage data.
-* **Transparent Data Compression:** Added `enableDataCompression` to `SynapseConfig`. Automatically compresses data (Gzip) before storage to save space on large datasets.
-* **In-Memory Testing Mode:** Added `memoryMode` to run the entire library in RAM, enabling lightning-fast unit tests without disk I/O.
-* **Conflict Resolution UI:** Introduced `SynapseConflictResolver`, a pre-built Widget to handle data conflicts visually with the user.
-* **Reactive Adapters:** Added `SynapseReactiveBuilder` and `SynapseProvider` for seamless integration with Flutter's widget tree (Riverpod/Bloc ready).
+* **🔍 Sync Audit Trail (Built-in Logging):**
+    * Introduced `SynapseLogRegistry`. The library now maintains a detailed internal history of every sync attempt, success, and failure.
+    * Added `Synapse.logs` and `Synapse.logStream` to allow developers to display logs in-app or send them to crash reporting tools (Sentry/Crashlytics) easily.
+
+* **🧹 One-Line Secure Wipe:**
+    * Added `Synapse.wipeAndReset()`. A single command that securely destroys all local databases, clears the pending queue, cancels background tasks, and flushes logs. Perfect for "Logout" functionality ensuring no data leaks between users.
+
+* **💓 Scheduled Background Heartbeat:**
+    * Added `Synapse.schedulePeriodicSync()`. The library can now wake up the app in the background (every 15+ minutes) to fetch data even when the app is closed, powered by `workmanager`.
+
+* **⚡ Smart Stream Throttling:**
+    * Implemented intelligent debouncing in `watchAll()`. Even if thousands of updates arrive per second, the UI now receives a maximum of one update every 50ms, eliminating UI jank and keeping FPS high.
+
+* **🤖 Auto-Type Conversion Engine:**
+    * Added automatic serialization for complex types. `DateTime` and nested Maps are now automatically converted to JSON-safe primitives before storage and sync, removing the need for manual boilerplate conversion code.
 
 ### 🛠 Improvements
 
-* Refactored `SynapseRepository` to use the Strategy Pattern for storage drivers.
-* Optimized `QueueStorage` for batch processing.
-* Improved error handling for offline scenarios.
-* Cleaned up library exports for a better IntelliSense experience.
+* **Dependency Update:** Added `rxdart`, `workmanager`, `connectivity_plus`, and `battery_plus` to core dependencies to support the new features.
+* **Battery & Network Awareness:** Background sync now automatically pauses if the device is low on battery or offline.
+* **Batch Processing Logic:** Enhanced the queue processing to handle rapid-fire create operations more efficiently.
 
-### ⚠️ Breaking Changes
+### ⚠️ Migration Guide
 
-* Direct instantiation of `SynapseRepositoryImpl` is now discouraged in favor of `Synapse.create`.
-* `HiveStorage` now requires a `fromJson` factory in its constructor.
+* **New Permissions Required:** To use the new Background Heartbeat feature, you must add `WAKE_LOCK` permissions to your Android Manifest and enable `Background Fetch` in iOS capabilities.
+* **Initialization:** Ensure `SynapseBackgroundService.initialize()` is called if you plan to use background syncing.

@@ -10,14 +10,14 @@ abstract class SynapseStorage<T extends SynapseEntity> {
   Future<T?> read(String id);
 
   /// Writes (Create/Update) an entity to the storage.
-  /// If [SynapseConfig.enableDataCompression] is true, the implementation
-  /// handles compression internally.
+  /// Implementations MUST handle DateTime/Complex types if not handled by Entity.
   Future<void> write(T item);
 
   /// Deletes an entity by its ID.
   Future<void> delete(String id);
 
-  /// Clears all data in this storage box/table.
+  /// Feature 22: Secure Wipe Support
+  /// This must completely destroy all data in the table/box.
   Future<void> clear();
   
   /// Closes the storage connection (if applicable).

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'src/feature_showcase.dart';
 import 'src/drift_integration.dart';
 import 'src/isar_integration.dart';
+import 'src/new_features_demo.dart'; // تأكد من وجود هذا الملف
 
 void main() {
   runApp(const SynapseExampleApp());
@@ -14,7 +15,11 @@ class SynapseExampleApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Synapse Link Examples',
-      theme: ThemeData(primarySwatch: Colors.indigo, useMaterial3: true),
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primarySwatch: Colors.indigo,
+        useMaterial3: true,
+      ),
       home: const ExampleDashboard(),
     );
   }
@@ -26,14 +31,23 @@ class ExampleDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Synapse Link V2 Demos')),
+      appBar: AppBar(title: const Text('Synapse Link V1.1')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          // البطاقة الخاصة بالميزات الجديدة
           _buildNavCard(
             context,
-            title: 'Full Feature Showcase (ToDo App)',
-            subtitle: 'Demonstrates Validation, Compression, Reactive UI & Conflict Resolution.',
+            title: 'New Features Lab',
+            subtitle: 'Audit Logs, Wipe, Throttling & Background Sync',
+            icon: Icons.science,
+            target: const NewFeaturesDemo(),
+          ),
+          const SizedBox(height: 10),
+          _buildNavCard(
+            context,
+            title: 'Full Feature Showcase',
+            subtitle: 'ToDo App with Validation & Conflict Resolution',
             icon: Icons.check_circle_outline,
             target: const FeatureShowcase(),
           ),
@@ -41,7 +55,7 @@ class ExampleDashboard extends StatelessWidget {
           _buildNavCard(
             context,
             title: 'Drift (SQL) Integration',
-            subtitle: 'How to use Synapse with Drift/SQLite backend.',
+            subtitle: 'Synapse + SQLite Backend',
             icon: Icons.table_chart,
             target: const DriftIntegrationDemo(),
           ),
@@ -49,7 +63,7 @@ class ExampleDashboard extends StatelessWidget {
           _buildNavCard(
             context,
             title: 'Isar (NoSQL) Integration',
-            subtitle: 'High-performance storage using Isar.',
+            subtitle: 'Synapse + Isar Backend',
             icon: Icons.bolt,
             target: const IsarIntegrationDemo(),
           ),
@@ -66,11 +80,12 @@ class ExampleDashboard extends StatelessWidget {
   }) {
     return Card(
       elevation: 4,
+      margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
-        leading: Icon(icon, size: 40, color: Colors.indigo),
+        leading: Icon(icon, color: Colors.indigo),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(subtitle),
-        trailing: const Icon(Icons.arrow_forward_ios),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => target)),
       ),
     );
