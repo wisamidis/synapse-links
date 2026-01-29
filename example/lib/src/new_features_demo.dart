@@ -1,20 +1,15 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:synapse_link/synapse_link.dart';
 
-// -----------------------------------------------------------------------------
-// 1. نموذج البيانات (LogItem)
-// يجب أن تكون المتغيرات non-nullable لتطابق المكتبة
-// -----------------------------------------------------------------------------
 class LogItem extends SynapseEntity {
   @override
   final String id;
   
   @override
-  final DateTime updatedAt; // غير قابل للفراغ (مطلوب)
+  final DateTime updatedAt;
   
   @override
-  final bool isDeleted;     // غير قابل للفراغ (مطلوب)
+  final bool isDeleted;    
 
   final String action;
   final DateTime timestamp;
@@ -25,9 +20,8 @@ class LogItem extends SynapseEntity {
     required this.timestamp,
     DateTime? updatedAt, 
     this.isDeleted = false,
-  }) : updatedAt = updatedAt ?? DateTime.now(); // تعيين قيمة افتراضية
+  }) : updatedAt = updatedAt ?? DateTime.now();
 
-  // دالة التحويل من JSON
   factory LogItem.fromJson(Map<String, dynamic> json) {
     return LogItem(
       id: json['id'],
@@ -48,9 +42,6 @@ class LogItem extends SynapseEntity {
   };
 }
 
-// -----------------------------------------------------------------------------
-// 2. واجهة العرض (UI)
-// -----------------------------------------------------------------------------
 class NewFeaturesDemo extends StatefulWidget {
   const NewFeaturesDemo({super.key});
 
@@ -72,7 +63,6 @@ class _NewFeaturesDemoState extends State<NewFeaturesDemo> {
     _repo = Synapse.create<LogItem>(
       storage: InMemoryStorage<LogItem>(),
       
-      // ✅ التعديل هنا حسب طلبك: fromJson داخل الشبكة
       network: MockSynapseNetwork<LogItem>(
         fromJson: LogItem.fromJson, 
       ),

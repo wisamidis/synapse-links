@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'src/feature_showcase.dart';
 import 'src/drift_integration.dart';
 import 'src/isar_integration.dart';
-import 'src/new_features_demo.dart'; // تأكد من وجود هذا الملف
+import 'src/new_features_demo.dart';
 
 void main() {
   runApp(const SynapseExampleApp());
@@ -35,7 +35,6 @@ class ExampleDashboard extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // البطاقة الخاصة بالميزات الجديدة
           _buildNavCard(
             context,
             title: 'New Features Lab',
